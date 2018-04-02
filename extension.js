@@ -62,7 +62,7 @@ function loadAndRenderCoverage() {
             let getRange = function (i) {
                 return editor.document.lineAt(i).range;
             };
-            Object.keys(decoMap).forEach(function(k) {
+            Object.keys(decoMap).forEach(function (k) {
                 editor.setDecorations(decoMap[k], []);
             })
             Object.keys(coverage).forEach(function (k) {
@@ -73,19 +73,28 @@ function loadAndRenderCoverage() {
     });
 }
 
+function parseProf() {
+    let configs = vscode.workspace.getConfiguration('launch', null)['configurations'];
+    let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
+    let extensionPath = vscode.extensions.getExtension('lunastorm.coverage').extensionPath;
+
+    childProc.exec(extensionPath + '/parse.py ' + rootPath + ' ' + launchConfig['program'], (err) => {
+        if (err) {
+            console.log(err);
+            return;
+        }
+        loadAndRenderCoverage();
+    });
+}
+
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 function activate(context) {
     let disposable = vscode.commands.registerCommand('coverage', function () {
-        let configs = vscode.workspace.getConfiguration('launch', null)['configurations'];
-        let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
-        childProc.exec(context.extensionPath + '/parse.py ' + rootPath + ' ' + launchConfig['program'], (err) => {
-            if (err) {
-                console.log(err);
-                return;
-            }
-            loadAndRenderCoverage();
-        });
+        let watcher = vscode.workspace.createFileSystemWatcher(`${rootPath}/default.profraw`);
+        watcher.onDidChange(parseProf);
+        watcher.onDidCreate(parseProf);
+        parseProf();
     });
     context.subscriptions.push(disposable);
 }
