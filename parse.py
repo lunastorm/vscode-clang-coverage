@@ -3,16 +3,19 @@
 import json
 import itertools
 import os
+import re
 
 if len(os.sys.argv) == 1:
     path = "."
+    exe = "a.out"
 else:
     path = os.sys.argv[1]
+    exe = os.sys.argv[2]
 
 os.chdir(path)
 os.system("llvm-profdata merge --sparse -o default.profdata default.profraw")
-os.system("llvm-cov show ./a.out -instr-profile=default.profdata -format=html -output-dir=coverage")
-os.system("llvm-cov show ./a.out -use-color=false -instr-profile=default.profdata -format=text -output-dir=coverage")
+os.system("llvm-cov show %s -instr-profile=default.profdata -format=html -output-dir=coverage" % exe)
+os.system("llvm-cov show %s -use-color=false -instr-profile=default.profdata -format=text -output-dir=coverage" % exe)
 
 files = (map(lambda x: os.path.join(v[0], x), v[2]) for v in
          os.walk("coverage/coverage"))
@@ -37,9 +40,11 @@ Created: 2018-04-01 22:25
    11|      0|}
 """
 
+line_re = re.compile("^[ 0-9]+\\|[ 0-9]*\\|.*$")
+
 for file_path in txts:
     counts_raw = (l.split("|", 2)[1].strip() for l in
-                  open(file_path) if "|" in l)
+                  open(file_path) if line_re.match(l))
     counts = (min(int(x), 1) if x else -1 for x in counts_raw)
 
     d = reduce(lambda r, c: r.setdefault(c[0], []).append(c[1])

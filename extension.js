@@ -6,45 +6,58 @@ const fs = require('fs');
 
 const coveredDeco = vscode.window.createTextEditorDecorationType({
     dark: {
-        backgroundColor: "DarkGreen"
+        backgroundColor: 'DarkGreen'
     },
     light: {
-        backgroundColor: "LightGreen"
+        backgroundColor: 'LightGreen'
     },
     isWholeLine: true
 });
 
 const uncoveredDeco = vscode.window.createTextEditorDecorationType({
     dark: {
-        backgroundColor: "DarkRed"
+        backgroundColor: 'DarkRed'
     },
     light: {
-        backgroundColor: "LightRed"
+        backgroundColor: 'LightPink'
     },
     isWholeLine: true
 });
 
 const naDeco = vscode.window.createTextEditorDecorationType({
     dark: {
-        backgroundColor: ""
+        backgroundColor: ''
     },
     light: {
-        backgroundColor: ""
+        backgroundColor: ''
     },
     isWholeLine: true
 });
 
 const decoMap = {
-    "-1": naDeco,
-    "0": uncoveredDeco,
-    "1": coveredDeco
+    '-1': naDeco,
+    '0': uncoveredDeco,
+    '1': coveredDeco
 };
+
 const rootPath = vscode.workspace.rootPath;
 
 function loadAndRenderCoverage() {
     vscode.window.visibleTextEditors.forEach(function (editor) {
-        let jsonPath = rootPath + "/coverage/coverage/" + editor.document.fileName + ".txt.json";
+        var filePath = editor.document.fileName;
+        if (!/\.(cpp|c|h|hpp|cc|hh|cxx)$/.test(filePath)) {
+            return;
+        }
+        let tmp = filePath.split(':');
+        if (tmp.length == 2) {
+            filePath = tmp[1];
+        }
+        let jsonPath = rootPath + '/coverage/coverage/' + filePath + '.txt.json';
         fs.readFile(jsonPath, function (err, data) {
+            if (err) {
+                console.log(err);
+                return;
+            }
             let coverage = JSON.parse(data);
             let getRange = function (i) {
                 return editor.document.lineAt(i).range;
@@ -64,9 +77,11 @@ function loadAndRenderCoverage() {
 // your extension is activated the very first time the command is executed
 function activate(context) {
     let disposable = vscode.commands.registerCommand('coverage', function () {
-        childProc.exec(context.extensionPath + "/parse.py " + rootPath, (error) => {
-            if (error) {
-                console.log(error);
+        let configs = vscode.workspace.getConfiguration('launch', null)['configurations'];
+        let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
+        childProc.exec(context.extensionPath + '/parse.py ' + rootPath + ' ' + launchConfig['program'], (err) => {
+            if (err) {
+                console.log(err);
                 return;
             }
             loadAndRenderCoverage();
