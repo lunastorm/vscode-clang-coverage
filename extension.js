@@ -43,7 +43,7 @@ const decoMap = {
 const rootPath = vscode.workspace.rootPath;
 
 function loadAndRenderCoverage() {
-    vscode.window.visibleTextEditors.forEach(function (editor) {
+    vscode.window.visibleTextEditors.forEach((editor) => {
         var filePath = editor.document.fileName;
         if (!/\.(cpp|c|h|hpp|cc|hh|cxx)$/.test(filePath)) {
             return;
@@ -53,19 +53,19 @@ function loadAndRenderCoverage() {
             filePath = tmp[1];
         }
         let jsonPath = rootPath + '/coverage/coverage/' + filePath + '.txt.json';
-        fs.readFile(jsonPath, function (err, data) {
+        fs.readFile(jsonPath, (err, data) => {
             if (err) {
                 console.log(err);
                 return;
             }
             let coverage = JSON.parse(data);
-            let getRange = function (i) {
+            let getRange = (i) => {
                 return editor.document.lineAt(i).range;
             };
-            Object.keys(decoMap).forEach(function (k) {
+            Object.keys(decoMap).forEach((k) => {
                 editor.setDecorations(decoMap[k], []);
             })
-            Object.keys(coverage).forEach(function (k) {
+            Object.keys(coverage).forEach((k) => {
                 let range = coverage[k].map(getRange);
                 editor.setDecorations(decoMap[k], range);
             });
@@ -90,7 +90,7 @@ function parseProf() {
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 function activate(context) {
-    let disposable = vscode.commands.registerCommand('coverage', function () {
+    let disposable = vscode.commands.registerCommand('coverage', () => {
         let watcher = vscode.workspace.createFileSystemWatcher(`${rootPath}/default.profraw`);
         watcher.onDidChange(parseProf);
         watcher.onDidCreate(parseProf);
