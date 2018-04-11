@@ -14,6 +14,7 @@ else:
 
 os.chdir(path)
 os.system("llvm-profdata merge --sparse -o default.profdata default.profraw")
+os.system("llvm-cov export %s -instr-profile=default.profdata > coverage.json" % exe)
 os.system("llvm-cov show %s -instr-profile=default.profdata -format=html -output-dir=coverage" % exe)
 os.system("llvm-cov show %s -use-color=false -instr-profile=default.profdata -format=text -output-dir=coverage" % exe)
 

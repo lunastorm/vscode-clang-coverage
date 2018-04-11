@@ -42,7 +42,16 @@ const decoMap = {
 
 const rootPath = vscode.workspace.rootPath;
 
+function clearCoverage() {
+    vscode.window.visibleTextEditors.forEach((editor) => {
+        Object.keys(decoMap).forEach((k) => {
+            editor.setDecorations(decoMap[k], []);
+        });
+    });
+}
+
 function loadAndRenderCoverage() {
+    clearCoverage();
     vscode.window.visibleTextEditors.forEach((editor) => {
         var filePath = editor.document.fileName;
         if (!/\.(cpp|c|h|hpp|cc|hh|cxx)$/.test(filePath)) {
@@ -62,9 +71,6 @@ function loadAndRenderCoverage() {
             let getRange = (i) => {
                 return editor.document.lineAt(i).range;
             };
-            Object.keys(decoMap).forEach((k) => {
-                editor.setDecorations(decoMap[k], []);
-            })
             Object.keys(coverage).forEach((k) => {
                 let range = coverage[k].map(getRange);
                 editor.setDecorations(decoMap[k], range);
@@ -76,7 +82,7 @@ function loadAndRenderCoverage() {
 function parseProf() {
     let configs = vscode.workspace.getConfiguration('launch', null)['configurations'];
     let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
-    let extensionPath = vscode.extensions.getExtension('lunastorm.coverage').extensionPath;
+    let extensionPath = vscode.extensions.getExtension('lunastorm.vscode-clang-coverage').extensionPath;
 
     childProc.exec(extensionPath + '/parse.py ' + rootPath + ' ' + launchConfig['program'], (err) => {
         if (err) {
@@ -87,16 +93,24 @@ function parseProf() {
     });
 }
 
+var watcher = null;
+
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 function activate(context) {
-    let disposable = vscode.commands.registerCommand('coverage', () => {
-        let watcher = vscode.workspace.createFileSystemWatcher(`${rootPath}/default.profraw`);
+    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageShow', () => {
+        watcher = vscode.workspace.createFileSystemWatcher('**/default.profraw');
         watcher.onDidChange(parseProf);
         watcher.onDidCreate(parseProf);
         parseProf();
-    });
-    context.subscriptions.push(disposable);
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageHide', () => {
+        if (watcher != null) {
+            clearCoverage();
+            watcher.dispose();
+            watcher = null;
+        }
+    }));
 }
 exports.activate = activate;
 

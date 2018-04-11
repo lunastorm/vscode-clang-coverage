@@ -1,9 +1,10 @@
 {
-    "name": "coverage",
-    "displayName": "coverage",
-    "description": "coverage",
+    "name": "vscode-clang-coverage",
+    "displayName": "Clang-Coverage",
+    "description": "Display Clang source-based coverage result",
     "version": "0.0.1",
     "publisher": "lunastorm",
+    "license": "MIT",
     "engines": {
         "vscode": "^1.21.0"
     },
@@ -11,14 +12,22 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:coverage"
+        "onCommand:extension.clangCoverageShow",
+        "onLanguage:c",
+        "onLanguage:cpp"
     ],
     "main": "./extension",
     "contributes": {
         "commands": [
             {
-                "command": "coverage",
-                "title": "Coverage"
+                "command": "extension.clangCoverageShow",
+                "title": "Show",
+                "category": "Clang-Coverage"
+            },
+            {
+                "command": "extension.clangCoverageHide",
+                "title": "Hide",
+                "category": "Clang-Coverage"
             }
         ]
     },
