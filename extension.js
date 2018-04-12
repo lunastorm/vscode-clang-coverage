@@ -79,12 +79,13 @@ function loadAndRenderCoverage() {
     });
 }
 
+var ctx = null;
+
 function parseProf() {
     let configs = vscode.workspace.getConfiguration('launch', null)['configurations'];
     let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
-    let extensionPath = vscode.extensions.getExtension('lunastorm.vscode-clang-coverage').extensionPath;
 
-    childProc.exec(extensionPath + '/parse.py ' + rootPath + ' ' + launchConfig['program'], (err) => {
+    childProc.exec(ctx.extensionPath + '/parse.py ' + rootPath + ' ' + launchConfig['program'], (err) => {
         if (err) {
             console.log(err);
             return;
@@ -98,6 +99,7 @@ var watcher = null;
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 function activate(context) {
+    ctx = context;
     context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageShow', () => {
         watcher = vscode.workspace.createFileSystemWatcher('**/default.profraw');
         watcher.onDidChange(parseProf);
