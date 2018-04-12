@@ -40,8 +40,6 @@ const decoMap = {
     '1': coveredDeco
 };
 
-const rootPath = vscode.workspace.rootPath;
-
 function clearCoverage() {
     vscode.window.visibleTextEditors.forEach((editor) => {
         Object.keys(decoMap).forEach((k) => {
@@ -50,7 +48,7 @@ function clearCoverage() {
     });
 }
 
-function loadAndRenderCoverage() {
+function loadAndRenderCoverage(profDir) {
     clearCoverage();
     vscode.window.visibleTextEditors.forEach((editor) => {
         var filePath = editor.document.fileName;
@@ -61,7 +59,7 @@ function loadAndRenderCoverage() {
         if (tmp.length == 2) {
             filePath = tmp[1];
         }
-        let jsonPath = rootPath + '/coverage/coverage/' + filePath + '.txt.json';
+        let jsonPath = profDir + '/coverage/coverage/' + filePath + '.txt.json';
         fs.readFile(jsonPath, (err, data) => {
             if (err) {
                 console.log(err);
@@ -82,22 +80,28 @@ function loadAndRenderCoverage() {
 var ctx = null;
 
 function parseProf() {
-    let configs = vscode.workspace.getConfiguration('launch', null)['configurations'];
-    let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
-
-    childProc.exec(ctx.extensionPath + '/parse.py ' + rootPath + ' ' + launchConfig['program'], (err) => {
+    let conf = vscode.workspace.getConfiguration('clang-coverage');
+    let profDir = conf.get('profDir');
+    if (profDir == null) {
+        profDir = vscode.workspace.rootPath;
+    }
+    let targetExe = conf.get('targetExe');
+    if (targetExe == null) {
+        let configs = vscode.workspace.getConfiguration('launch', null)['configurations'];
+        let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
+        targetExe = launchConfig['program'];
+    }
+    childProc.exec(ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe, (err) => {
         if (err) {
             console.log(err);
             return;
         }
-        loadAndRenderCoverage();
+        loadAndRenderCoverage(profDir);
     });
 }
 
 var watcher = null;
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
 function activate(context) {
     ctx = context;
     context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageShow', () => {
@@ -116,7 +120,6 @@ function activate(context) {
 }
 exports.activate = activate;
 
-// this method is called when your extension is deactivated
 function deactivate() {
 }
 exports.deactivate = deactivate;

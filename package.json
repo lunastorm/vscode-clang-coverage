@@ -29,7 +29,22 @@
                 "title": "Hide",
                 "category": "Clang-Coverage"
             }
-        ]
+        ],
+        "configuration": {
+            "title": "clang-coverage",
+            "properties": {
+                "clang-coverage.profDir": {
+                    "type": ["string", "null"],
+                    "default": null,
+                    "description": "Path to the directory containing .profraw"
+                },
+                "clang-coverage.targetExe": {
+                    "type": ["string", "null"],
+                    "default": null,
+                    "description": "Path to the profiled executable"
+                }
+            }
+        }
     },
     "scripts": {
         "postinstall": "node ./node_modules/vscode/bin/install",
