@@ -79,8 +79,7 @@ function loadAndRenderCoverage(profDir) {
 
 var ctx = null;
 
-function parseProf() {
-    let conf = vscode.workspace.getConfiguration('clang-coverage');
+function parseProf(conf) {
     let profDir = conf.get('profDir');
     if (profDir == null) {
         profDir = vscode.workspace.rootPath;
@@ -102,21 +101,33 @@ function parseProf() {
 
 var watcher = null;
 
-function activate(context) {
-    ctx = context;
-    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageShow', () => {
+function showHide() {
+    let conf = vscode.workspace.getConfiguration('clang-coverage');
+    if (conf.get('show')) {
         watcher = vscode.workspace.createFileSystemWatcher('**/default.profraw');
         watcher.onDidChange(parseProf);
         watcher.onDidCreate(parseProf);
-        parseProf();
-    }));
-    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageHide', () => {
+        parseProf(conf);
+    } else {
         if (watcher != null) {
             clearCoverage();
             watcher.dispose();
             watcher = null;
         }
+    }
+}
+
+function activate(context) {
+    ctx = context;
+    vscode.workspace.onDidChangeConfiguration(showHide)
+
+    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageShow', () => {
+        vscode.workspace.getConfiguration('clang-coverage').update('show', true)
     }));
+    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageHide', () => {
+        vscode.workspace.getConfiguration('clang-coverage').update('show', false)
+    }));
+    showHide();
 }
 exports.activate = activate;
 

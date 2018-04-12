@@ -42,6 +42,11 @@
                     "type": ["string", "null"],
                     "default": null,
                     "description": "Path to the profiled executable"
+                },
+                "clang-coverage.show": {
+                    "type": ["boolean"],
+                    "default": false,
+                    "description": "Show coverage result or not"
                 }
             }
         }
