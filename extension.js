@@ -109,14 +109,14 @@ function showHide() {
             watcher = vscode.workspace.createFileSystemWatcher('**/default.profraw');
             watcher.onDidChange(parseProf);
             watcher.onDidCreate(parseProf);
-            parseProf();
         }
+        parseProf();
     } else {
         if (watcher != null) {
-            clearCoverage();
             watcher.dispose();
             watcher = null;
         }
+        clearCoverage();
     }
 }
 
