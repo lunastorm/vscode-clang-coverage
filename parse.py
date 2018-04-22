@@ -53,3 +53,6 @@ for file_path in txts:
 
     with open(file_path + ".json", "w") as f:
         json.dump(d, f)
+
+with open("coverage.last", "w") as f:
+    f.write("%d" % int(os.stat("default.profraw").st_mtime * 1000))

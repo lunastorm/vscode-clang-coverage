@@ -48,7 +48,10 @@ function clearCoverage() {
     });
 }
 
-function loadAndRenderCoverage(profDir) {
+var profDir = null;
+var targetExe = null;
+
+function loadAndRenderCoverage() {
     clearCoverage();
     vscode.window.visibleTextEditors.forEach((editor) => {
         var filePath = editor.document.fileName;
@@ -80,51 +83,79 @@ function loadAndRenderCoverage(profDir) {
 var ctx = null;
 
 function parseProf() {
+    childProc.exec(ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe, (err) => {
+        if (err) {
+            vscode.window.showErrorMessage(err);
+            console.log(err);
+            return;
+        }
+        loadAndRenderCoverage();
+    });
+}
+
+function processProf() {
+    fs.stat(profDir + '/default.profraw', (err, stat) => {
+        if (err) {
+            return;
+        }
+        fs.readFile(profDir + '/coverage.last', (err, data) => {
+            if (err || new Date(stat.mtime).getTime() != data) {
+                parseProf();
+            } else {
+                return;
+            }
+        });
+    });
+}
+
+function showHide() {
     let conf = vscode.workspace.getConfiguration('clang-coverage');
-    let profDir = conf.get('profDir');
+    if (conf.get('show')) {
+        loadAndRenderCoverage();
+    } else {
+        clearCoverage();
+    }
+}
+
+function loadConfig() {
+    let conf = vscode.workspace.getConfiguration('clang-coverage');
+    profDir = conf.get('profDir');
     if (profDir == null) {
         profDir = vscode.workspace.rootPath;
     }
-    let targetExe = conf.get('targetExe');
+    targetExe = conf.get('targetExe');
     if (targetExe == null) {
         let configs = vscode.workspace.getConfiguration('launch', null)['configurations'];
         let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
         targetExe = launchConfig['program'];
     }
-    childProc.exec(ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe, (err) => {
-        if (err) {
-            console.log(err);
-            return;
-        }
-        loadAndRenderCoverage(profDir);
-    });
 }
 
-var watcher = null;
-
-function showHide() {
-    let conf = vscode.workspace.getConfiguration('clang-coverage');
-    if (conf.get('show')) {
-        if (watcher == null) {
-            watcher = vscode.workspace.createFileSystemWatcher('**/default.profraw');
-            watcher.onDidChange(parseProf);
-            watcher.onDidCreate(parseProf);
-        }
-        parseProf();
-    } else {
-        if (watcher != null) {
-            watcher.dispose();
-            watcher = null;
-        }
-        clearCoverage();
+function configUpdate(e) {
+    if (e.affectsConfiguration('clang-coverage.show')) {
+        showHide();
+    }
+    if (e.affectsConfiguration('clang-coverage.profDir') ||
+        e.affectsConfiguration('clang-coverage.targetExe')) {
+        loadConfig();
+        processProf();
+        showHide();
     }
 }
 
 function activate(context) {
     ctx = context;
-    vscode.workspace.onDidChangeConfiguration(showHide)
-    vscode.window.onDidChangeActiveTextEditor(showHide)
 
+    vscode.workspace.onDidChangeConfiguration(configUpdate)
+    loadConfig();
+
+    let watcher = vscode.workspace.createFileSystemWatcher('**/default.profraw');
+    watcher.onDidChange(processProf);
+    watcher.onDidCreate(processProf);
+    context.subscriptions.push(watcher);
+    processProf();
+
+    vscode.window.onDidChangeActiveTextEditor(showHide)
     context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageShow', () => {
         vscode.workspace.getConfiguration('clang-coverage').update('show', true)
     }));
