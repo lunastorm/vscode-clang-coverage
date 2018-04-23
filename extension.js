@@ -82,6 +82,15 @@ function loadAndRenderCoverage() {
 
 var ctx = null;
 
+function showHide() {
+    let conf = vscode.workspace.getConfiguration('clang-coverage');
+    if (conf.get('show')) {
+        loadAndRenderCoverage();
+    } else {
+        clearCoverage();
+    }
+}
+
 function parseProf() {
     childProc.exec(ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe, (err) => {
         if (err) {
@@ -89,7 +98,7 @@ function parseProf() {
             console.log(err);
             return;
         }
-        loadAndRenderCoverage();
+        showHide();
     });
 }
 
@@ -106,15 +115,6 @@ function processProf() {
             }
         });
     });
-}
-
-function showHide() {
-    let conf = vscode.workspace.getConfiguration('clang-coverage');
-    if (conf.get('show')) {
-        loadAndRenderCoverage();
-    } else {
-        clearCoverage();
-    }
 }
 
 function loadConfig() {
