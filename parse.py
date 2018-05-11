@@ -39,14 +39,19 @@ Created: 2018-04-01 22:25
     9|      0|{
    10|      0|    return 0;
    11|      0|}
+   12|       |
+   13|       |int foo3()
+   14|  23.5k|{
+   15|  23.5k|    return 0;
+   16|  23.5k|}
 """
 
-line_re = re.compile("^[ 0-9]+\\|[ 0-9]*\\|.*$")
+line_re = re.compile("^[ 0-9]+\\|[ 0-9.]*[kmg]?\\|.*$")
 
 for file_path in txts:
     counts_raw = (l.split("|", 2)[1].strip() for l in
                   open(file_path) if line_re.match(l))
-    counts = (min(int(x), 1) if x else -1 for x in counts_raw)
+    counts = (0 if x == '0' else 1 if x else -1 for x in counts_raw)
 
     d = reduce(lambda r, c: r.setdefault(c[0], []).append(c[1])
                or r, zip(counts, itertools.count()), {})
