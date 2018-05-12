@@ -69,8 +69,14 @@ function loadAndRenderCoverage() {
                 return;
             }
             let coverage = JSON.parse(data);
-            let getRange = (i) => {
-                return editor.document.lineAt(i).range;
+            let getRange = (r) => {
+                let begin = r[0];
+                let end = r.length == 1 ? r[0]: r[1];
+                var r = editor.document.lineAt(begin).range;
+                for (var i = begin + 1; i <= end; i++) {
+                    r = r.union(editor.document.lineAt(i).range);
+                }
+                return r;
             };
             Object.keys(coverage).forEach((k) => {
                 let range = coverage[k].map(getRange);
