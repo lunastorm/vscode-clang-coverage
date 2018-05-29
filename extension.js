@@ -162,6 +162,9 @@ function activate(context) {
     processProf();
 
     vscode.window.onDidChangeActiveTextEditor(showHide)
+    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageRefresh', () => {
+        processProf();
+    }));
     context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageShow', () => {
         vscode.workspace.getConfiguration('clang-coverage').update('show', true)
     }));
