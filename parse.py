@@ -46,7 +46,7 @@ Created: 2018-04-01 22:25
    16|  23.5k|}
 """
 
-line_re = re.compile("^[ 0-9]+\\|[ 0-9.]*[kmg]?\\|.*$")
+line_re = re.compile("^[ 0-9]+\\|[ 0-9.]*[kKmMgG]?\\|.*$")
 
 for file_path in txts:
     counts_raw = (l.split("|", 2)[1].strip() for l in
