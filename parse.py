@@ -4,6 +4,8 @@ import json
 import itertools
 import os
 import re
+from functools import reduce
+from io import open
 
 if len(os.sys.argv) == 1:
     path = "."
@@ -48,18 +50,27 @@ Created: 2018-04-01 22:25
 
 line_re = re.compile("^[ 0-9]+\\|[ 0-9.]*[kKmMgG]?\\|.*$")
 
+if os.sys.version_info[0] < 3:
+    write_mode = "wb"
+else:
+    write_mode = "w"
+
 for file_path in txts:
     counts_raw = (l.split("|", 2)[1].strip() for l in
-                  open(file_path) if line_re.match(l))
+                  open(file_path, errors="ignore") if line_re.match(l))
     counts = (0 if x == '0' else 1 if x else -1 for x in counts_raw)
 
     d = reduce(lambda r, c: r.setdefault(c[0], []).append(c[1])
                or r, zip(counts, itertools.count()), {})
-    compressed = {k: reduce(lambda r, c: r.append([r.pop()[0], c]) or r if c == r[-1][-1] + 1 else r.append([c]) or r, v, [[-2]])[1:] 
-                  for (k, v) in d.iteritems()}
+    if os.sys.version_info[0] < 3:
+        iteritems = d.iteritems()
+    else:
+        iteritems = d.items()
+    compressed = {k: reduce(lambda r, c: r.append([r.pop()[0], c]) or r if c == r[-1][-1] + 1 else r.append([c]) or r, v, [[-2]])[1:]
+                  for (k, v) in iteritems}
 
-    with open(file_path + ".json", "w") as f:
+    with open(file_path + ".json", write_mode) as f:
         json.dump(compressed, f)
 
-with open("coverage.last", "w") as f:
+with open("coverage.last", write_mode) as f:
     f.write("%d" % int(os.stat("default.profraw").st_mtime * 1000))
