@@ -10,12 +10,14 @@ from io import open
 if len(os.sys.argv) == 1:
     path = "."
     exe = "a.out"
+    prof = "default.profraw"
 else:
     path = os.sys.argv[1]
     exe = os.sys.argv[2]
+    prof = os.sys.argv[3]
 
 os.chdir(path)
-os.system("llvm-profdata merge --sparse -o default.profdata default.profraw")
+os.system("llvm-profdata merge --sparse -o default.profdata %s" % prof)
 os.system("llvm-cov export %s --summary-only -instr-profile=default.profdata > coverage.json" % exe)
 os.system("llvm-cov show %s -instr-profile=default.profdata -format=html -output-dir=coverage" % exe)
 os.system("llvm-cov show %s -use-color=false -instr-profile=default.profdata -format=text -output-dir=coverage" % exe)
@@ -73,4 +75,4 @@ for file_path in txts:
         json.dump(compressed, f)
 
 with open("coverage.last", write_mode) as f:
-    f.write("%d" % int(os.stat("default.profraw").st_mtime * 1000))
+    f.write("%d" % int(os.stat(prof).st_mtime * 1000))

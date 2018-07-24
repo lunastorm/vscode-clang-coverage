@@ -3,6 +3,7 @@
 const vscode = require('vscode');
 const childProc = require('child_process');
 const fs = require('fs');
+const glob = require('glob');
 
 const coveredDeco = vscode.window.createTextEditorDecorationType({
     dark: {
@@ -49,6 +50,7 @@ function clearCoverage() {
 }
 
 var profDir = null;
+var profPattern = null;
 var targetExe = null;
 
 function loadAndRenderCoverage() {
@@ -97,8 +99,8 @@ function showHide() {
     }
 }
 
-function parseProf() {
-    childProc.exec(ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe, (err) => {
+function parseProf(prof) {
+    childProc.exec(ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe + ' ' + prof, (err) => {
         if (err) {
             vscode.window.showErrorMessage(err);
             console.log(err);
@@ -108,19 +110,26 @@ function parseProf() {
     });
 }
 
-function processProf() {
-    fs.stat(profDir + '/default.profraw', (err, stat) => {
-        if (err) {
+function getLatestProf(err, files) {
+    if (err != null) {
+        vscode.window.showErrorMessage(err);
+        return;
+    }
+    if (files.length == 0) {
+        return;
+    }
+    var latest = files.map((v) => ({name: v, stat: fs.statSync(v)})).sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs)[0];
+    fs.readFile(profDir + '/coverage.last', (err, data) => {
+        if (err || new Date(latest.stat.mtime).getTime() != data) {
+            parseProf(latest.name);
+        } else {
             return;
         }
-        fs.readFile(profDir + '/coverage.last', (err, data) => {
-            if (err || new Date(stat.mtime).getTime() != data) {
-                parseProf();
-            } else {
-                return;
-            }
-        });
     });
+}
+
+function processProf() {
+    glob(profDir + '/' + profPattern, {}, getLatestProf);
 }
 
 function loadConfig() {
@@ -128,6 +137,10 @@ function loadConfig() {
     profDir = conf.get('profDir');
     if (profDir == null) {
         profDir = vscode.workspace.rootPath;
+    }
+    profPattern = conf.get('profPattern');
+    if (profPattern == null) {
+        profPattern = '**/*.profraw'
     }
     targetExe = conf.get('targetExe');
     if (targetExe == null) {
@@ -142,6 +155,7 @@ function configUpdate(e) {
         showHide();
     }
     if (e.affectsConfiguration('clang-coverage.profDir') ||
+        e.affectsConfiguration('clang-coverage.profPattern') ||
         e.affectsConfiguration('clang-coverage.targetExe')) {
         loadConfig();
         processProf();
@@ -155,7 +169,7 @@ function activate(context) {
     vscode.workspace.onDidChangeConfiguration(configUpdate)
     loadConfig();
 
-    let watcher = vscode.workspace.createFileSystemWatcher('**/default.profraw');
+    let watcher = vscode.workspace.createFileSystemWatcher(profPattern);
     watcher.onDidChange(processProf);
     watcher.onDidCreate(processProf);
     context.subscriptions.push(watcher);
