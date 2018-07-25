@@ -2,7 +2,7 @@
     "name": "vscode-clang-coverage",
     "displayName": "Clang-Coverage",
     "description": "Display Clang source-based coverage result",
-    "version": "0.0.10",
+    "version": "0.0.11",
     "publisher": "lunastorm",
     "license": "MIT",
     "engines": {
@@ -71,6 +71,9 @@
         "eslint": "^4.11.0",
         "@types/node": "^7.0.43",
         "@types/mocha": "^2.2.42"
+    },
+    "dependencies": {
+        "glob": "^7.1.2"
     },
     "repository": "https://github.com/lunastorm/vscode-clang-coverage"
 }
