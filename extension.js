@@ -100,7 +100,7 @@ function showHide() {
 }
 
 function parseProf(prof) {
-    childProc.exec(ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe + ' ' + prof, (err) => {
+    childProc.exec('python ' + ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe + ' ' + prof, (err) => {
         if (err) {
             vscode.window.showErrorMessage(err);
             console.log(err);
