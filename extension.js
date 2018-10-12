@@ -109,7 +109,7 @@ function parseProf(prof) {
     var command = parseCommand ? parseCommand + ' ' + prof : 'python ' + ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe + ' ' + prof;
     childProc.exec(command, (err) => {
         if (err) {
-            vscode.window.showErrorMessage(err);
+            vscode.window.showErrorMessage("Failed to parse profile: " + err);
             console.log(err);
             return;
         }
