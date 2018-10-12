@@ -75,4 +75,4 @@ for file_path in txts:
         json.dump(compressed, f)
 
 with open("coverage.last", write_mode) as f:
-    f.write("%d" % int(os.stat(prof).st_mtime * 1000))
+    f.write("%d" % round(os.stat(prof).st_mtime * 1000))
