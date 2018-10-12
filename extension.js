@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const childProc = require('child_process');
 const fs = require('fs');
 const glob = require('glob');
+const path = require('path');
 
 const coveredDeco = vscode.window.createTextEditorDecorationType({
     dark: {
@@ -52,6 +53,8 @@ function clearCoverage() {
 var profDir = null;
 var profPattern = null;
 var targetExe = null;
+var fileMapping = null;
+var parseCommand = null;
 
 function loadAndRenderCoverage() {
     clearCoverage();
@@ -60,11 +63,14 @@ function loadAndRenderCoverage() {
         if (!/\.(cpp|c|h|hpp|cc|hh|cxx)$/.test(filePath)) {
             return;
         }
-        let tmp = filePath.split(':');
-        if (tmp.length == 2) {
-            filePath = tmp[1];
+        var jsonPath = fileMapping[filePath];
+        if (jsonPath === undefined) {
+            let tmp = filePath.split(':');
+            if (tmp.length == 2) {
+                filePath = tmp[1];
+            }
+            jsonPath = profDir + '/coverage/coverage/' + filePath + '.txt.json';
         }
-        let jsonPath = profDir + '/coverage/coverage/' + filePath + '.txt.json';
         fs.readFile(jsonPath, (err, data) => {
             if (err) {
                 console.log(err);
@@ -100,7 +106,8 @@ function showHide() {
 }
 
 function parseProf(prof) {
-    childProc.exec('python ' + ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe + ' ' + prof, (err) => {
+    var command = parseCommand ? parseCommand + ' ' + prof : 'python ' + ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe + ' ' + prof;
+    childProc.exec(command, (err) => {
         if (err) {
             vscode.window.showErrorMessage(err);
             console.log(err);
@@ -121,7 +128,7 @@ function getLatestProf(err, files) {
     var latest = files.map((v) => ({name: v, stat: fs.statSync(v)})).sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs)[0];
     fs.readFile(profDir + '/coverage.last', (err, data) => {
         if (err || new Date(latest.stat.mtime).getTime() != data) {
-            parseProf(latest.name);
+            parseProf(path.basename(latest.name));
         } else {
             return;
         }
@@ -148,6 +155,8 @@ function loadConfig() {
         let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
         targetExe = launchConfig['program'];
     }
+    fileMapping = conf.get('fileMapping');
+    parseCommand = conf.get('parseCommand');
 }
 
 function configUpdate(e) {
@@ -156,6 +165,8 @@ function configUpdate(e) {
     }
     if (e.affectsConfiguration('clang-coverage.profDir') ||
         e.affectsConfiguration('clang-coverage.profPattern') ||
+        e.affectsConfiguration('clang-coverage.parseCommand') ||
+        e.affectsConfiguration('clang-coverage.fileMapping') ||
         e.affectsConfiguration('clang-coverage.targetExe')) {
         loadConfig();
         processProf();
