@@ -55,6 +55,7 @@ var profPattern = null;
 var targetExe = null;
 var fileMapping = null;
 var parseCommand = null;
+var processing = false;
 
 function loadAndRenderCoverage() {
     clearCoverage();
@@ -106,8 +107,10 @@ function showHide() {
 }
 
 function parseProf(prof) {
+    processing = true;
     var command = parseCommand ? parseCommand + ' ' + prof : 'python ' + ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe + ' ' + prof;
     childProc.exec(command, (err) => {
+        processing = false;
         if (err) {
             vscode.window.showErrorMessage("Failed to parse profile: " + err);
             console.log(err);
@@ -174,6 +177,14 @@ function configUpdate(e) {
     }
 }
 
+function polling() {
+    let conf = vscode.workspace.getConfiguration('clang-coverage');
+    if (conf.get("polling") && !processing) {
+        processProf();
+    }
+    setTimeout(polling, 3000);
+}
+
 function activate(context) {
     ctx = context;
 
@@ -185,6 +196,7 @@ function activate(context) {
     watcher.onDidCreate(processProf);
     context.subscriptions.push(watcher);
     processProf();
+    polling();
 
     vscode.window.onDidChangeActiveTextEditor(showHide)
     context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageRefresh', () => {

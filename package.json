@@ -2,7 +2,7 @@
     "name": "vscode-clang-coverage",
     "displayName": "Clang-Coverage",
     "description": "Display Clang source-based coverage result",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "publisher": "lunastorm",
     "license": "MIT",
     "engines": {
@@ -62,6 +62,11 @@
                     "type": ["object"],
                     "default": {},
                     "description": "Map source file path to the coverage result file path"
+                },
+                "clang-coverage.polling": {
+                    "type": ["boolean"],
+                    "default": false,
+                    "description": "Polling on profile data change, for example, files on NFS cannot be watched"
                 },
                 "clang-coverage.show": {
                     "type": ["boolean"],
