@@ -50,7 +50,7 @@ Created: 2018-04-01 22:25
    16|  23.5k|}
 """
 
-line_re = re.compile("^[ 0-9]+\\|[ 0-9.]*[kKmMgG]?\\|.*$")
+line_re = re.compile("^[ ]*[0-9]+\\|[ 0-9.]*[kKmMgG]?\\|.*$")
 
 if os.sys.version_info[0] < 3:
     write_mode = "wb"
