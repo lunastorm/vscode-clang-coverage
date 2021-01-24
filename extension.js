@@ -1,217 +1,170 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-const vscode = require('vscode');
-const childProc = require('child_process');
-const fs = require('fs');
-const glob = require('glob');
-const path = require('path');
+const vscode = require("vscode");
+const fs = require("fs");
+const util = require("util");
+const { Script } = require("vm");
+const glob = util.promisify(require("glob").glob);
+const exec = util.promisify(require("child_process").exec);
 
-const coveredDeco = vscode.window.createTextEditorDecorationType({
+const covered_deco = vscode.window.createTextEditorDecorationType({
     dark: {
         backgroundColor: 'DarkGreen'
     },
     light: {
         backgroundColor: 'LightGreen'
     },
-    isWholeLine: true
+    isWholeLine: false
 });
 
-const uncoveredDeco = vscode.window.createTextEditorDecorationType({
+const uncovered_deco = vscode.window.createTextEditorDecorationType({
     dark: {
         backgroundColor: 'DarkRed'
     },
     light: {
         backgroundColor: 'LightPink'
     },
-    isWholeLine: true
+    isWholeLine: false
 });
 
-const naDeco = vscode.window.createTextEditorDecorationType({
-    dark: {
-        backgroundColor: ''
-    },
-    light: {
-        backgroundColor: ''
-    },
-    isWholeLine: true
-});
+let coverage_map = {};
+let output_dir;
+let profraw_dir;
+let profraw_pattern;
+let path_mappings;
+let binary_path;
+let parse_command;
 
-const decoMap = {
-    '-1': naDeco,
-    '0': uncoveredDeco,
-    '1': coveredDeco
-};
-
-function clearCoverage() {
-    vscode.window.visibleTextEditors.forEach((editor) => {
-        Object.keys(decoMap).forEach((k) => {
-            editor.setDecorations(decoMap[k], []);
-        });
-    });
+function load_config() {
+    const conf = vscode.workspace.getConfiguration("clang-coverage");
+    output_dir = conf.get("outputDir");
+    if (output_dir === null) {
+        output_dir = vscode.workspace.workspaceFolders[0].uri.path;
+    }
+    profraw_dir = conf.get("profrawDir");
+    if (profraw_dir === null) {
+        profraw_dir = vscode.workspace.workspaceFolders[0].uri.path;
+    }
+    profraw_pattern = conf.get("profrawPattern");
+    if (profraw_pattern === null) {
+        profraw_pattern = "*.profraw";
+    }
+    path_mappings = conf.get("pathMappings");
+    binary_path = conf.get("binaryPath");
+    if (binary_path === null) {
+        const configs = vscode.workspace.getConfiguration("launch",
+            vscode.workspace.workspaceFolders[0].uri)["configurations"];
+        const launch_config = configs.filter(
+            config => config["request"] == "launch")[0]
+        binary_path = `${vscode.workspace.workspaceFolders[0].uri.path}/${launch_config["program"]}`;
+    }
+    parse_command = conf.get("parseCommand");
 }
 
-var profDir = null;
-var profPattern = null;
-var targetExe = null;
-var fileMapping = null;
-var parseCommand = null;
-var processing = false;
+function show_coverage(editor) {
+    const file_path = editor.document.fileName;
+    if (!/\.(cpp|c|h|hpp|cc|hh|cxx)$/.test(file_path)) {
+        return;
+    }
+    let segments = coverage_map[file_path];
+    if (segments === undefined) {
+        for (const [server, current] of Object.entries(path_mappings)) {
+            segments = coverage_map[file_path.replace(current, server)];
+            if (segments) {
+                break;
+            }
+        }
+    }
+    if (!segments) {
+        return;
+    }
+    const covered_ranges = segments.reduce((acc, s) => {
+        if (acc.prev[3]) {
+            acc.result[acc.prev[2] > 0].push(new vscode.Range(
+                new vscode.Position(acc.prev[0] - 1, acc.prev[1] - 1),
+                new vscode.Position(s[0] - 1, s[1] - 1)));
+        }
+        acc.prev = s;
+        return acc;
+    }, {result: {true: [], false: []}, prev: [1, 1, 0, false, false]}).result;
 
-function loadAndRenderCoverage() {
-    clearCoverage();
-    vscode.window.visibleTextEditors.forEach((editor) => {
-        var filePath = editor.document.fileName;
-        if (!/\.(cpp|c|h|hpp|cc|hh|cxx)$/.test(filePath)) {
-            return;
-        }
-        var jsonPath = fileMapping[filePath];
-        if (jsonPath === undefined) {
-            let tmp = filePath.split(':');
-            if (tmp.length == 2) {
-                filePath = tmp[1];
-            }
-            jsonPath = profDir + '/coverage/coverage/' + filePath + '.txt.json';
-        }
-        fs.readFile(jsonPath, (err, data) => {
-            if (err) {
-                console.log(err);
-                return;
-            }
-            let coverage = JSON.parse(data);
-            let getRange = (r) => {
-                let begin = r[0];
-                let end = r.length == 1 ? r[0]: r[1];
-                var r = editor.document.lineAt(begin).range;
-                for (var i = begin + 1; i <= end; i++) {
-                    r = r.union(editor.document.lineAt(i).range);
-                }
-                return r;
-            };
-            Object.keys(coverage).forEach((k) => {
-                let range = coverage[k].map(getRange);
-                editor.setDecorations(decoMap[k], range);
-            });
-        });
-    });
+    editor.setDecorations(covered_deco, covered_ranges[true]);
+    editor.setDecorations(uncovered_deco, covered_ranges[false]);
 }
 
-var ctx = null;
+function refresh_coverage_display() {
+    vscode.window.visibleTextEditors.forEach((editor) => {
+        editor.setDecorations(covered_deco, []);
+        editor.setDecorations(uncovered_deco, []);
+    });
+    if (vscode.workspace.getConfiguration("clang-coverage").get("show")) {
+        vscode.window.visibleTextEditors.forEach(show_coverage);
+    }
+}
 
-function showHide() {
-    let conf = vscode.workspace.getConfiguration('clang-coverage');
-    if (conf.get('show')) {
-        loadAndRenderCoverage();
+async function load_coverage() {
+    try {
+        const coverage = JSON.parse(await fs.promises.readFile(`${output_dir}/coverage.json`));
+        coverage_map = coverage.data[0].files.reduce(
+            (acc, f) => Object.assign({[f.filename]: f.segments}, acc), {});
+    } catch (e) {
+        console.log(e);
+    }
+    refresh_coverage_display();
+}
+
+async function parse_profile(e) {
+    let profraw_path;
+    if (e) {
+        profraw_path = e.path;
     } else {
-        clearCoverage();
+        profraw_path = await glob(`${profraw_dir}/${profraw_pattern}`);
     }
+    if (parse_command) {
+        await exec(parse_command);
+    } else {
+        await exec(`llvm-profdata merge --sparse -o ${output_dir}/default.profdata ${profraw_path}`);
+        await exec(`llvm-cov show -format=html -output-dir=${output_dir} ${binary_path} -instr-profile=${output_dir}/default.profdata`);
+        await exec(`llvm-cov export ${binary_path} -instr-profile=${output_dir}/default.profdata > ${output_dir}/coverage.json`);
+    }
+    load_coverage();
 }
 
-function parseProf(prof) {
-    processing = true;
-    var command = parseCommand ? parseCommand + ' ' + prof : 'python ' + ctx.extensionPath + '/parse.py ' + profDir + ' ' + targetExe + ' ' + prof;
-    childProc.exec(command, (err) => {
-        processing = false;
-        if (err) {
-            vscode.window.showErrorMessage("Failed to parse profile: " + err);
-            console.log(err);
-            return;
-        }
-        showHide();
-    });
-}
-
-function getLatestProf(err, files) {
-    if (err != null) {
-        vscode.window.showErrorMessage(err);
-        return;
+async function config_update_handler(e) {
+    if (e.affectsConfiguration("clang-coverage.outputDir") ||
+        e.affectsConfiguration("clang-coverage.profrawDir") ||
+        e.affectsConfiguration("clang-coverage.profrawPattern") ||
+        e.affectsConfiguration("clang-coverage.pathMappings") ||
+        e.affectsConfiguration("clang-coverage.binaryPath")) {
+        load_config();
+        await parse_profile();
     }
-    if (files.length == 0) {
-        return;
-    }
-    var latest = files.map((v) => ({name: v, stat: fs.statSync(v)})).sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs)[0];
-    fs.readFile(profDir + '/coverage.last', (err, data) => {
-        if (err || new Date(latest.stat.mtime).getTime() != data) {
-            parseProf(path.basename(latest.name));
-        } else {
-            return;
-        }
-    });
-}
-
-function processProf() {
-    glob(profDir + '/' + profPattern, {}, getLatestProf);
-}
-
-function loadConfig() {
-    let conf = vscode.workspace.getConfiguration('clang-coverage');
-    profDir = conf.get('profDir');
-    if (profDir == null) {
-        profDir = vscode.workspace.rootPath;
-    }
-    profPattern = conf.get('profPattern');
-    if (profPattern == null) {
-        profPattern = '**/*.profraw'
-    }
-    targetExe = conf.get('targetExe');
-    if (targetExe == null) {
-        let configs = vscode.workspace.getConfiguration('launch', null)['configurations'];
-        let launchConfig = configs.filter(cfg => cfg['request'] == 'launch')[0]
-        targetExe = launchConfig['program'];
-    }
-    fileMapping = conf.get('fileMapping');
-    parseCommand = conf.get('parseCommand');
-}
-
-function configUpdate(e) {
-    if (e.affectsConfiguration('clang-coverage.show')) {
-        showHide();
-    }
-    if (e.affectsConfiguration('clang-coverage.profDir') ||
-        e.affectsConfiguration('clang-coverage.profPattern') ||
-        e.affectsConfiguration('clang-coverage.parseCommand') ||
-        e.affectsConfiguration('clang-coverage.fileMapping') ||
-        e.affectsConfiguration('clang-coverage.targetExe')) {
-        loadConfig();
-        processProf();
-        showHide();
-    }
-}
-
-function polling() {
-    let conf = vscode.workspace.getConfiguration('clang-coverage');
-    if (conf.get("polling") && !processing) {
-        processProf();
-    }
-    setTimeout(polling, 3000);
+    refresh_coverage_display();
 }
 
 function activate(context) {
-    ctx = context;
+    vscode.workspace.onDidChangeConfiguration(config_update_handler);
+    load_config();
 
-    vscode.workspace.onDidChangeConfiguration(configUpdate)
-    loadConfig();
-
-    let watcher = vscode.workspace.createFileSystemWatcher(profPattern);
-    watcher.onDidChange(processProf);
-    watcher.onDidCreate(processProf);
+    const watcher = vscode.workspace.createFileSystemWatcher(`${profraw_dir}/${profraw_pattern}`);
+    watcher.onDidChange(parse_profile);
+    watcher.onDidCreate(parse_profile);
     context.subscriptions.push(watcher);
-    processProf();
-    polling();
 
-    vscode.window.onDidChangeActiveTextEditor(showHide)
-    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageRefresh', () => {
-        processProf();
+    vscode.window.onDidChangeActiveTextEditor(refresh_coverage_display);
+    context.subscriptions.push(vscode.commands.registerCommand(
+        "extension.clangCoverageRefresh", () => {
+            vscode.workspace.getConfiguration("clang-coverage").update("show", true);
+            parse_profile();
     }));
-    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageShow', () => {
-        vscode.workspace.getConfiguration('clang-coverage').update('show', true)
+    context.subscriptions.push(vscode.commands.registerCommand(
+        "extension.clangCoverageShow", () => {
+            vscode.workspace.getConfiguration("clang-coverage").update("show", true);
     }));
-    context.subscriptions.push(vscode.commands.registerCommand('extension.clangCoverageHide', () => {
-        vscode.workspace.getConfiguration('clang-coverage').update('show', false)
+    context.subscriptions.push(vscode.commands.registerCommand(
+        "extension.clangCoverageHide", () => {
+            vscode.workspace.getConfiguration("clang-coverage").update("show", false);
     }));
-    showHide();
+    load_coverage();
 }
 exports.activate = activate;
 
-function deactivate() {
-}
-exports.deactivate = deactivate;
+exports.deactivate = () => {};

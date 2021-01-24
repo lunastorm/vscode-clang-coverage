@@ -2,7 +2,7 @@
     "name": "vscode-clang-coverage",
     "displayName": "Clang-Coverage",
     "description": "Display Clang source-based coverage result",
-    "version": "0.1.1",
+    "version": "0.9.1",
     "publisher": "lunastorm",
     "license": "MIT",
     "engines": {
@@ -38,35 +38,35 @@
         "configuration": {
             "title": "clang-coverage",
             "properties": {
-                "clang-coverage.profDir": {
+                "clang-coverage.outputDir": {
                     "type": ["string", "null"],
                     "default": null,
-                    "description": "Path to the directory containing .profraw"
+                    "description": "Output directory of the parsed coverage files. Default to the first workspace root if null"
                 },
-                "clang-coverage.profPattern": {
+                "clang-coverage.profrawDir": {
                     "type": ["string", "null"],
                     "default": null,
-                    "description": "Profraw's pattern"
+                    "description": "The directory which contains the profraw file. Default to the first workspace root if null"
                 },
-                "clang-coverage.targetExe": {
+                "clang-coverage.profrawPattern": {
                     "type": ["string", "null"],
                     "default": null,
-                    "description": "Path to the profiled executable"
+                    "description": "Profraw glob pattern. Default to *.profraw if null"
+                },
+                "clang-coverage.binaryPath": {
+                    "type": ["string", "null"],
+                    "default": null,
+                    "description": "Path to the profiled binary. Default to the first launch command if null"
                 },
                 "clang-coverage.parseCommand": {
                     "type": ["string", "null"],
                     "default": null,
-                    "description": "Customized command to parse coverage data"
+                    "description": "Customized parse command to generate outputDir/coverage.json"
                 },
-                "clang-coverage.fileMapping": {
+                "clang-coverage.pathMappings": {
                     "type": ["object"],
                     "default": {},
-                    "description": "Map source file path to the coverage result file path"
-                },
-                "clang-coverage.polling": {
-                    "type": ["boolean"],
-                    "default": false,
-                    "description": "Polling on profile data change, for example, files on NFS cannot be watched"
+                    "description": "Path mappings from the build server to the current path"
                 },
                 "clang-coverage.show": {
                     "type": ["boolean"],
