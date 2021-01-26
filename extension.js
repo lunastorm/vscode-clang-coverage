@@ -111,15 +111,23 @@ async function load_coverage() {
     refresh_coverage_display();
 }
 
+async function get_latest_profile() {
+    let profraws = await glob(`${profraw_dir}/${profraw_pattern}`);
+    const stats = await Promise.all(profraws.map(path => fs.promises.stat(path)));
+    profraws = profraws.map((path, i) => ({path: path, time: stats[i].mtimeMs}));
+    profraws.sort((a, b) => b.time - a.time);
+    return profraws[0].path;
+}
+
 async function parse_profile(e) {
     let profraw_path;
     if (e) {
         profraw_path = e.path;
     } else {
-        profraw_path = await glob(`${profraw_dir}/${profraw_pattern}`);
+        profraw_path = await get_latest_profile();
     }
     if (parse_command) {
-        await exec(parse_command);
+        await exec(`${parse_command} ${profraw_path}`);
     } else {
         await exec(`llvm-profdata merge --sparse -o ${output_dir}/default.profdata ${profraw_path}`);
         await exec(`llvm-cov show -format=html -output-dir=${output_dir} ${binary_path} -instr-profile=${output_dir}/default.profdata`);
@@ -144,7 +152,7 @@ function activate(context) {
     vscode.workspace.onDidChangeConfiguration(config_update_handler);
     load_config();
 
-    const watcher = vscode.workspace.createFileSystemWatcher(`${profraw_dir}/${profraw_pattern}`);
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(profraw_dir, profraw_pattern));
     watcher.onDidChange(parse_profile);
     watcher.onDidCreate(parse_profile);
     context.subscriptions.push(watcher);
@@ -163,7 +171,7 @@ function activate(context) {
         "extension.clangCoverageHide", () => {
             vscode.workspace.getConfiguration("clang-coverage").update("show", false);
     }));
-    load_coverage();
+    parse_profile();
 }
 exports.activate = activate;
 
