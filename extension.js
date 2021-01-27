@@ -64,10 +64,10 @@ function show_coverage(editor) {
     if (!/\.(cpp|c|h|hpp|cc|hh|cxx)$/.test(file_path)) {
         return;
     }
-    let segments = coverage_map[file_path];
+    let segments = coverage_map[file_path.replace(/\\/g, "/")];
     if (segments === undefined) {
         for (const [server, current] of Object.entries(path_mappings)) {
-            segments = coverage_map[file_path.replace(current, server)];
+            segments = coverage_map[file_path.replace(current, server).replace(/\\/g, "/")];
             if (segments) {
                 break;
             }
@@ -104,7 +104,7 @@ async function load_coverage() {
     try {
         const coverage = JSON.parse(await fs.promises.readFile(`${output_dir}/coverage.json`));
         coverage_map = coverage.data[0].files.reduce(
-            (acc, f) => Object.assign({[f.filename]: f.segments}, acc), {});
+            (acc, f) => Object.assign({[f.filename.replace(/\\/g, "/")]: f.segments}, acc), {});
     } catch (e) {
         console.log(e);
     }
