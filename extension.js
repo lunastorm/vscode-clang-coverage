@@ -1,7 +1,8 @@
 const vscode = require("vscode");
 const fs = require("fs");
 const util = require("util");
-const { Script } = require("vm");
+const JSONStream = require("JSONStream");
+const stream_reduce = require("stream-reduce");
 const glob = util.promisify(require("glob").glob);
 const exec = util.promisify(require("child_process").exec);
 
@@ -102,13 +103,14 @@ function refresh_coverage_display() {
 
 async function load_coverage() {
     try {
-        const coverage = JSON.parse(await fs.promises.readFile(`${output_dir}/coverage.json`));
-        coverage_map = coverage.data[0].files.reduce(
-            (acc, f) => Object.assign({[f.filename.replace(/\\/g, "/")]: f.segments}, acc), {});
+        fs.createReadStream(`${output_dir}/coverage.json`)
+            .pipe(JSONStream.parse("data.*.files.*"))
+            .pipe(stream_reduce(
+                (acc, f) => Object.assign({[f.filename.replace(/\\/g, "/")]: f.segments}, acc), {}
+            )).on("data", (obj) => {coverage_map = obj; refresh_coverage_display();});
     } catch (e) {
-        console.log(e);
+        vscode.window.showErrorMessage(`load failed: ${e}`);
     }
-    refresh_coverage_display();
 }
 
 async function get_latest_profile() {
