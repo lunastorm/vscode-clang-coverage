@@ -109,8 +109,7 @@
     },
     "dependencies": {
         "glob": "^7.1.2",
-        "JSONStream": "^1.3.5",
-        "stream-reduce": "^1.0.3"
+        "JSONStream": "^1.3.5"
     },
     "repository": "https://github.com/lunastorm/vscode-clang-coverage"
 }

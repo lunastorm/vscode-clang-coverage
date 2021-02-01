@@ -2,7 +2,6 @@ const vscode = require("vscode");
 const fs = require("fs");
 const util = require("util");
 const JSONStream = require("JSONStream");
-const stream_reduce = require("stream-reduce");
 const glob = util.promisify(require("glob").glob);
 const exec = util.promisify(require("child_process").exec);
 
@@ -105,9 +104,8 @@ async function load_coverage() {
     try {
         fs.createReadStream(`${output_dir}/coverage.json`)
             .pipe(JSONStream.parse("data.*.files.*"))
-            .pipe(stream_reduce(
-                (acc, f) => Object.assign({[f.filename.replace(/\\/g, "/")]: f.segments}, acc), {}
-            )).on("data", (obj) => {coverage_map = obj; refresh_coverage_display();});
+            .on("data", f => {coverage_map[f.filename.replace(/\\/g, "/")] = f.segments;})
+            .on("end", refresh_coverage_display);
     } catch (e) {
         vscode.window.showErrorMessage(`load failed: ${e}`);
     }
