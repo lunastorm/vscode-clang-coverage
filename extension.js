@@ -32,6 +32,7 @@ let profraw_pattern;
 let path_mappings;
 let binary_path;
 let parse_command;
+let is_processing = false;
 
 function load_config() {
     const conf = vscode.workspace.getConfiguration("clang-coverage");
@@ -91,6 +92,7 @@ function show_coverage(editor) {
 }
 
 function refresh_coverage_display() {
+    is_processing = false;
     vscode.window.visibleTextEditors.forEach((editor) => {
         editor.setDecorations(covered_deco, []);
         editor.setDecorations(uncovered_deco, []);
@@ -105,9 +107,11 @@ async function load_coverage() {
         fs.createReadStream(`${output_dir}/coverage.json`)
             .pipe(JSONStream.parse("data.*.files.*"))
             .on("data", f => {coverage_map[f.filename.replace(/\\/g, "/")] = f.segments;})
-            .on("end", refresh_coverage_display);
+            .on("end", refresh_coverage_display)
+            .on("error", refresh_coverage_display);
     } catch (e) {
         vscode.window.showErrorMessage(`load failed: ${e}`);
+        refresh_coverage_display();
     }
 }
 
@@ -120,6 +124,11 @@ async function get_latest_profile() {
 }
 
 async function parse_profile(e) {
+    if (is_processing) {
+        setTimeout(parse_profile, 1000);
+        return;
+    }
+    is_processing = true;
     let profraw_path;
     if (e) {
         profraw_path = e.path;
