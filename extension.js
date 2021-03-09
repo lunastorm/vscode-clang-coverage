@@ -25,7 +25,6 @@ const uncovered_deco = vscode.window.createTextEditorDecorationType({
     isWholeLine: false
 });
 
-let coverage_map = {};
 let output_dir;
 let profraw_dir;
 let profraw_pattern;
@@ -60,11 +59,14 @@ function load_config() {
     parse_command = conf.get("parseCommand");
 }
 
-function show_coverage(editor) {
+async function show_coverage(editor) {
     const file_path = editor.document.fileName;
     if (!/\.(cpp|c|h|hpp|cc|hh|cxx)$/.test(file_path)) {
         return;
     }
+    const result = JSON.parse((await exec(`llvm-cov export --skip-expansions -instr-profile=${output_dir}/default.profdata ${binary_path} ${file_path}`)).stdout);
+    const coverage_map = result.data[0].files.reduce((acc, c) => {acc[c.filename] = c.segments; return acc;}, {});
+
     let segments = coverage_map[file_path.replace(/\\/g, "/")];
     if (segments === undefined) {
         for (const [server, current] of Object.entries(path_mappings)) {
@@ -92,26 +94,12 @@ function show_coverage(editor) {
 }
 
 function refresh_coverage_display() {
-    is_processing = false;
     vscode.window.visibleTextEditors.forEach((editor) => {
         editor.setDecorations(covered_deco, []);
         editor.setDecorations(uncovered_deco, []);
     });
     if (vscode.workspace.getConfiguration("clang-coverage").get("show")) {
         vscode.window.visibleTextEditors.forEach(show_coverage);
-    }
-}
-
-async function load_coverage() {
-    try {
-        fs.createReadStream(`${output_dir}/coverage.json`)
-            .pipe(JSONStream.parse("data.*.files.*"))
-            .on("data", f => {coverage_map[f.filename.replace(/\\/g, "/")] = f.segments;})
-            .on("end", refresh_coverage_display)
-            .on("error", refresh_coverage_display);
-    } catch (e) {
-        vscode.window.showErrorMessage(`load failed: ${e}`);
-        refresh_coverage_display();
     }
 }
 
@@ -140,9 +128,9 @@ async function parse_profile(e) {
     } else {
         await exec(`llvm-profdata merge --sparse -o ${output_dir}/default.profdata ${profraw_path}`);
         await exec(`llvm-cov show -format=html -output-dir=${output_dir} ${binary_path} -instr-profile=${output_dir}/default.profdata`);
-        await exec(`llvm-cov export ${binary_path} -instr-profile=${output_dir}/default.profdata > ${output_dir}/coverage.json`);
     }
-    load_coverage();
+    is_processing = false;
+    refresh_coverage_display();
 }
 
 async function config_update_handler(e) {
