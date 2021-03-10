@@ -1,7 +1,6 @@
 const vscode = require("vscode");
 const fs = require("fs");
 const util = require("util");
-const JSONStream = require("JSONStream");
 const glob = util.promisify(require("glob").glob);
 const exec = util.promisify(require("child_process").exec);
 
@@ -31,7 +30,9 @@ let profraw_pattern;
 let path_mappings;
 let binary_path;
 let parse_command;
+let export_command;
 let is_processing = false;
+let coverage_maps = {};
 
 function load_config() {
     const conf = vscode.workspace.getConfiguration("clang-coverage");
@@ -57,6 +58,7 @@ function load_config() {
         binary_path = `${vscode.workspace.workspaceFolders[0].uri.path}/${launch_config["program"]}`;
     }
     parse_command = conf.get("parseCommand");
+    export_command = conf.get("exportCommand");
 }
 
 async function show_coverage(editor) {
@@ -64,7 +66,21 @@ async function show_coverage(editor) {
     if (!/\.(cpp|c|h|hpp|cc|hh|cxx)$/.test(file_path)) {
         return;
     }
-    const result = JSON.parse((await exec(`llvm-cov export --skip-expansions -instr-profile=${output_dir}/default.profdata ${binary_path} ${file_path}`)).stdout);
+    if (file_path in coverage_maps) {
+        editor.setDecorations(covered_deco, coverage_maps[file_path][true]);
+        editor.setDecorations(uncovered_deco, coverage_maps[file_path][false]);
+        return;
+    }
+    let result;
+    try {
+        if (export_command) {
+            result = JSON.parse((await exec(`${export_command} ${file_path.replace(/\\/g, "/")}`)).stdout);
+        } else {
+            result = JSON.parse((await exec(`llvm-cov export -instr-profile=${output_dir}/default.profdata ${binary_path} ${file_path.replace(/\\/g, "/")}`)).stdout);
+        }
+    } catch (e) {
+        vscode.window.showErrorMessage(`Export error: ${e}`);
+    }
     const coverage_map = result.data[0].files.reduce((acc, c) => {acc[c.filename] = c.segments; return acc;}, {});
 
     let segments = coverage_map[file_path.replace(/\\/g, "/")];
@@ -91,6 +107,7 @@ async function show_coverage(editor) {
 
     editor.setDecorations(covered_deco, covered_ranges[true]);
     editor.setDecorations(uncovered_deco, covered_ranges[false]);
+    coverage_maps[file_path] = covered_ranges;
 }
 
 function refresh_coverage_display() {
@@ -127,9 +144,9 @@ async function parse_profile(e) {
         await exec(`${parse_command} ${profraw_path}`);
     } else {
         await exec(`llvm-profdata merge --sparse -o ${output_dir}/default.profdata ${profraw_path}`);
-        await exec(`llvm-cov show -format=html -output-dir=${output_dir} ${binary_path} -instr-profile=${output_dir}/default.profdata`);
     }
     is_processing = false;
+    coverage_maps = {};
     refresh_coverage_display();
 }
 
