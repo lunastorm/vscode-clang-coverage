@@ -74,9 +74,9 @@ async function show_coverage(editor) {
     let result;
     try {
         if (export_command) {
-            result = JSON.parse((await exec(`${export_command} ${file_path.replace(/\\/g, "/")}`)).stdout);
+            result = JSON.parse((await exec(`${export_command} ${file_path.replace(/\\/g, "/")}`, {maxBuffer: 40 * 1024 * 1024})).stdout);
         } else {
-            result = JSON.parse((await exec(`llvm-cov export -instr-profile=${output_dir}/default.profdata ${binary_path} ${file_path.replace(/\\/g, "/")}`)).stdout);
+            result = JSON.parse((await exec(`llvm-cov export -instr-profile=${output_dir}/default.profdata ${binary_path} ${file_path.replace(/\\/g, "/")}`, {maxBuffer: 40 * 1024 * 1024})).stdout);
         }
     } catch (e) {
         vscode.window.showErrorMessage(`Export error: ${e}`);
