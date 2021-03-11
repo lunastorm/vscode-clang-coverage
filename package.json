@@ -2,7 +2,7 @@
     "name": "vscode-clang-coverage",
     "displayName": "Clang-Coverage",
     "description": "Display Clang source-based coverage result",
-    "version": "0.9.7",
+    "version": "0.9.8",
     "publisher": "lunastorm",
     "license": "MIT",
     "engines": {

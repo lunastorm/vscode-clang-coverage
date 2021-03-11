@@ -79,7 +79,7 @@ async function show_coverage(editor) {
             result = JSON.parse((await exec(`llvm-cov export -instr-profile=${output_dir}/default.profdata ${binary_path} ${file_path.replace(/\\/g, "/")}`, {maxBuffer: 40 * 1024 * 1024})).stdout);
         }
     } catch (e) {
-        vscode.window.showErrorMessage(`Export error: ${e}`);
+        // vscode.window.showErrorMessage(`Export error: ${e}`);
     }
     const coverage_map = result.data[0].files.reduce((acc, c) => {acc[c.filename] = c.segments; return acc;}, {});
 
@@ -122,6 +122,9 @@ function refresh_coverage_display() {
 
 async function get_latest_profile() {
     let profraws = await glob(`${profraw_dir}/${profraw_pattern}`);
+    if (profraws.length == 0) {
+        return null;
+    }
     const stats = await Promise.all(profraws.map(path => fs.promises.stat(path)));
     profraws = profraws.map((path, i) => ({path: path, time: stats[i].mtimeMs}));
     profraws.sort((a, b) => b.time - a.time);
@@ -139,6 +142,10 @@ async function parse_profile(e) {
         profraw_path = e.path;
     } else {
         profraw_path = await get_latest_profile();
+        if (profraw_path === null) {
+            is_processing = false;
+            return;
+        }
     }
     if (parse_command) {
         await exec(`${parse_command} ${profraw_path}`);
