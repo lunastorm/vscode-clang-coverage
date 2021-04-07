@@ -24,6 +24,16 @@ const uncovered_deco = vscode.window.createTextEditorDecorationType({
     isWholeLine: false
 });
 
+const partial_condition_deco = vscode.window.createTextEditorDecorationType({
+    dark: {
+        backgroundColor: 'Sienna'
+    },
+    light: {
+        backgroundColor: 'Orange'
+    },
+    isWholeLine: false
+});
+
 let output_dir;
 let profraw_dir;
 let profraw_pattern;
@@ -33,6 +43,7 @@ let parse_command;
 let export_command;
 let is_processing = false;
 let coverage_maps = {};
+let partial_condition_maps = {};
 
 function load_config() {
     const conf = vscode.workspace.getConfiguration("clang-coverage");
@@ -69,6 +80,9 @@ async function show_coverage(editor) {
     if (file_path in coverage_maps) {
         editor.setDecorations(covered_deco, coverage_maps[file_path][true]);
         editor.setDecorations(uncovered_deco, coverage_maps[file_path][false]);
+        if (file_path in partial_condition_maps) {
+            editor.setDecorations(partial_condition_deco, partial_condition_ranges[true].concat(partial_condition_ranges[false]));
+        }
         return;
     }
     let result;
@@ -81,20 +95,21 @@ async function show_coverage(editor) {
     } catch (e) {
         // vscode.window.showErrorMessage(`Export error: ${e}`);
     }
-    const coverage_map = result.data[0].files.reduce((acc, c) => {acc[c.filename] = c.segments; return acc;}, {});
+    const file = result.data[0].files[0];
 
-    let segments = coverage_map[file_path.replace(/\\/g, "/")];
-    if (segments === undefined) {
-        for (const [server, current] of Object.entries(path_mappings)) {
-            segments = coverage_map[file_path.replace(current, server).replace(/\\/g, "/")];
-            if (segments) {
+    if (file.filename !== file_path.replace(/\\/g, "/")) {
+        let found = false;
+        for (const [remote, local] of Object.entries(path_mappings)) {
+            if (file.filename === file_path.replace(local, remote).replace(/\\/g, "/")) {
+                found = true;
                 break;
             }
         }
+        if (!found) {
+            return;
+        }
     }
-    if (!segments) {
-        return;
-    }
+    const segments = file.segments;
     const covered_ranges = segments.reduce((acc, s) => {
         if (acc.prev[3]) {
             acc.result[acc.prev[2] > 0].push(new vscode.Range(
@@ -108,6 +123,24 @@ async function show_coverage(editor) {
     editor.setDecorations(covered_deco, covered_ranges[true]);
     editor.setDecorations(uncovered_deco, covered_ranges[false]);
     coverage_maps[file_path] = covered_ranges;
+
+    const branches = file.branches;
+    if (!branches) {
+        return;
+    }
+    const partial_condition_ranges = branches.reduce((acc, s) => {
+        if ((s[4] > 0 && s[5] > 0) || (s[4] == 0 && s[5] == 0)) {
+            return;
+        }
+        acc[s[4] > 0].push(new vscode.Range(
+            new vscode.Position(s[0] - 1, s[1] - 1),
+            new vscode.Position(s[2] - 1, s[3] - 1)
+        ));
+        return acc;
+    }, {true: [], false: []});
+
+    editor.setDecorations(partial_condition_deco, partial_condition_ranges[true].concat(partial_condition_ranges[false]));
+    partial_condition_maps[file_path] = partial_condition_ranges;
 }
 
 function refresh_coverage_display() {
@@ -154,6 +187,7 @@ async function parse_profile(e) {
     }
     is_processing = false;
     coverage_maps = {};
+    partial_condition_maps = {};
     refresh_coverage_display();
 }
 
