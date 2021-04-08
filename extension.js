@@ -56,6 +56,8 @@ let export_command;
 let is_processing = false;
 let coverage_maps = {};
 let partial_condition_maps = {};
+let summary_maps = {};
+let status_bar_item;
 
 function load_config() {
     const conf = vscode.workspace.getConfiguration("clang-coverage");
@@ -95,6 +97,14 @@ async function show_coverage(editor) {
         if (file_path in partial_condition_maps) {
             editor.setDecorations(true_condition_deco, partial_condition_maps[file_path][true]);
             editor.setDecorations(false_condition_deco, partial_condition_maps[file_path][false]);
+        }
+        if (editor === vscode.window.activeTextEditor) {
+            const summary = summary_maps[file_path];
+            status_bar_item.text = `Function ${Math.floor(summary.functions.percent)}% (${summary.functions.covered}/${summary.functions.count}), Region ${Math.floor(summary.regions.percent)}% (${summary.regions.covered}/${summary.regions.count})`;
+            if (summary.branches) {
+                status_bar_item.text += `, Branch ${Math.floor(summary.branches.percent)}% (${summary.branches.covered}/${summary.branches.count})`;
+            }
+            status_bar_item.show();
         }
         return;
     }
@@ -155,9 +165,20 @@ async function show_coverage(editor) {
     editor.setDecorations(true_condition_deco, partial_condition_ranges[true]);
     editor.setDecorations(false_condition_deco, partial_condition_ranges[false]);
     partial_condition_maps[file_path] = partial_condition_ranges;
+
+    const summary = file.summary;
+    if (editor === vscode.window.activeTextEditor) {
+        status_bar_item.text = `Function ${Math.floor(summary.functions.percent)}% (${summary.functions.covered}/${summary.functions.count}), Region ${Math.floor(summary.regions.percent)}% (${summary.regions.covered}/${summary.regions.count})`;
+        if (summary.branches) {
+            status_bar_item.text += `, Branch ${Math.floor(summary.branches.percent)}% (${summary.branches.covered}/${summary.branches.count})`;
+        }
+        status_bar_item.show();
+    }
+    summary_maps[file_path] = summary;
 }
 
 function refresh_coverage_display() {
+    status_bar_item.hide();
     vscode.window.visibleTextEditors.forEach((editor) => {
         editor.setDecorations(covered_deco, []);
         editor.setDecorations(uncovered_deco, []);
@@ -204,6 +225,7 @@ async function parse_profile(e) {
     is_processing = false;
     coverage_maps = {};
     partial_condition_maps = {};
+    summary_maps = {};
     refresh_coverage_display();
 }
 
@@ -242,6 +264,8 @@ function activate(context) {
         "extension.clangCoverageHide", () => {
             vscode.workspace.getConfiguration("clang-coverage").update("show", false);
     }));
+    status_bar_item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 9999);
+
     parse_profile();
 }
 exports.activate = activate;
