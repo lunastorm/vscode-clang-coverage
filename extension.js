@@ -24,11 +24,23 @@ const uncovered_deco = vscode.window.createTextEditorDecorationType({
     isWholeLine: false
 });
 
-const partial_condition_deco = vscode.window.createTextEditorDecorationType({
+const true_condition_deco = vscode.window.createTextEditorDecorationType({
     dark: {
         backgroundColor: 'Sienna'
     },
     light: {
+        backgroundColor: 'Orange'
+    },
+    isWholeLine: false
+});
+
+const false_condition_deco = vscode.window.createTextEditorDecorationType({
+    dark: {
+        textDecoration: 'line-through',
+        backgroundColor: 'Sienna'
+    },
+    light: {
+        textDecoration: 'line-through',
         backgroundColor: 'Orange'
     },
     isWholeLine: false
@@ -81,7 +93,8 @@ async function show_coverage(editor) {
         editor.setDecorations(covered_deco, coverage_maps[file_path][true]);
         editor.setDecorations(uncovered_deco, coverage_maps[file_path][false]);
         if (file_path in partial_condition_maps) {
-            editor.setDecorations(partial_condition_deco, partial_condition_ranges[true].concat(partial_condition_ranges[false]));
+            editor.setDecorations(true_condition_deco, partial_condition_maps[file_path][true]);
+            editor.setDecorations(false_condition_deco, partial_condition_maps[file_path][false]);
         }
         return;
     }
@@ -139,7 +152,8 @@ async function show_coverage(editor) {
         return acc;
     }, {true: [], false: []});
 
-    editor.setDecorations(partial_condition_deco, partial_condition_ranges[true].concat(partial_condition_ranges[false]));
+    editor.setDecorations(true_condition_deco, partial_condition_ranges[true]);
+    editor.setDecorations(false_condition_deco, partial_condition_ranges[false]);
     partial_condition_maps[file_path] = partial_condition_ranges;
 }
 
@@ -147,6 +161,8 @@ function refresh_coverage_display() {
     vscode.window.visibleTextEditors.forEach((editor) => {
         editor.setDecorations(covered_deco, []);
         editor.setDecorations(uncovered_deco, []);
+        editor.setDecorations(true_condition_deco, []);
+        editor.setDecorations(false_condition_deco, []);
     });
     if (vscode.workspace.getConfiguration("clang-coverage").get("show")) {
         vscode.window.visibleTextEditors.forEach(show_coverage);
