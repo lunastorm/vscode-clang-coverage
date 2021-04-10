@@ -153,7 +153,7 @@ async function show_coverage(editor) {
     }
     const partial_condition_ranges = branches.reduce((acc, s) => {
         if ((s[4] > 0 && s[5] > 0) || (s[4] == 0 && s[5] == 0)) {
-            return;
+            return acc;
         }
         acc[s[4] > 0].push(new vscode.Range(
             new vscode.Position(s[0] - 1, s[1] - 1),
