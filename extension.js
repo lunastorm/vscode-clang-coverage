@@ -113,7 +113,7 @@ async function show_coverage(editor) {
         if (export_command) {
             result = JSON.parse((await exec(`${export_command} ${file_path.replace(/\\/g, "/")}`, {maxBuffer: 40 * 1024 * 1024})).stdout);
         } else {
-            result = JSON.parse((await exec(`llvm-cov export -instr-profile=${output_dir}/default.profdata ${binary_path} ${file_path.replace(/\\/g, "/")}`, {maxBuffer: 40 * 1024 * 1024})).stdout);
+            result = JSON.parse((await exec(`llvm-cov export --skip-functions --skip-expansions --instr-profile=${output_dir}/default.profdata ${binary_path} ${file_path.replace(/\\/g, "/")}`, {maxBuffer: 40 * 1024 * 1024})).stdout);
         }
     } catch (e) {
         // vscode.window.showErrorMessage(`Export error: ${e}`);
@@ -147,6 +147,15 @@ async function show_coverage(editor) {
     editor.setDecorations(uncovered_deco, covered_ranges[false]);
     coverage_maps[file_path] = covered_ranges;
 
+    const summary = file.summary;
+    if (editor === vscode.window.activeTextEditor) {
+        status_bar_item.text = `Function ${Math.floor(summary.functions.percent)}% (${summary.functions.covered}/${summary.functions.count}), Region ${Math.floor(summary.regions.percent)}% (${summary.regions.covered}/${summary.regions.count})`;
+        if (summary.branches) {
+            status_bar_item.text += `, Branch ${Math.floor(summary.branches.percent)}% (${summary.branches.covered}/${summary.branches.count})`;
+        }
+        status_bar_item.show();
+    }
+    summary_maps[file_path] = summary;
     const branches = file.branches;
     if (!branches) {
         return;
@@ -165,16 +174,6 @@ async function show_coverage(editor) {
     editor.setDecorations(true_condition_deco, partial_condition_ranges[true]);
     editor.setDecorations(false_condition_deco, partial_condition_ranges[false]);
     partial_condition_maps[file_path] = partial_condition_ranges;
-
-    const summary = file.summary;
-    if (editor === vscode.window.activeTextEditor) {
-        status_bar_item.text = `Function ${Math.floor(summary.functions.percent)}% (${summary.functions.covered}/${summary.functions.count}), Region ${Math.floor(summary.regions.percent)}% (${summary.regions.covered}/${summary.regions.count})`;
-        if (summary.branches) {
-            status_bar_item.text += `, Branch ${Math.floor(summary.branches.percent)}% (${summary.branches.covered}/${summary.branches.count})`;
-        }
-        status_bar_item.show();
-    }
-    summary_maps[file_path] = summary;
 }
 
 function refresh_coverage_display() {
