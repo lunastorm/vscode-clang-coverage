@@ -25,6 +25,12 @@ const uncovered_deco = vscode.window.createTextEditorDecorationType({
 });
 
 const true_condition_deco = vscode.window.createTextEditorDecorationType({
+    before: {
+        contentText: ' t ',
+        color: 'red',
+        backgroundColor: 'yellow',
+        fontWeight: 'bold'
+    },
     dark: {
         backgroundColor: 'Sienna'
     },
@@ -35,12 +41,16 @@ const true_condition_deco = vscode.window.createTextEditorDecorationType({
 });
 
 const false_condition_deco = vscode.window.createTextEditorDecorationType({
+    before: {
+        contentText: ' f ',
+        color: 'red',
+        backgroundColor: 'yellow',
+        fontWeight: 'bold'
+    },
     dark: {
-        textDecoration: 'line-through',
         backgroundColor: 'Sienna'
     },
     light: {
-        textDecoration: 'line-through',
         backgroundColor: 'Orange'
     },
     isWholeLine: false
